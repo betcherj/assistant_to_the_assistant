@@ -9,6 +9,8 @@ from ..types import (
     AgentGuidelines,
     ComponentIndex,
     InfrastructureDescription,
+    BusinessContext,
+    BusinessContextArtifact,
 )
 from ..project_indexer import ProjectIndexer
 
@@ -32,6 +34,8 @@ class ProjectResourceManager:
         self.agent_guidelines_path = self.resources_dir / "agent_guidelines.json"
         self.component_index_path = self.resources_dir / "component_index.json"
         self.infrastructure_path = self.resources_dir / "infrastructure.json"
+        self.business_context_path = self.resources_dir / "business_context.json"
+        self.business_context_dir = self.resources_dir / "business-context"
     
     def save_business_goals(self, business_goals: BusinessGoals) -> None:
         """Save business goals to disk."""
@@ -155,6 +159,19 @@ class ProjectResourceManager:
             "status": "indexed"
         }
     
+    def save_business_context(self, business_context: BusinessContext) -> None:
+        """Save business context to disk."""
+        with open(self.business_context_path, 'w') as f:
+            json.dump(business_context.model_dump(), f, indent=2)
+    
+    def load_business_context(self) -> Optional[BusinessContext]:
+        """Load business context from disk."""
+        if not self.business_context_path.exists():
+            return None
+        with open(self.business_context_path, 'r') as f:
+            data = json.load(f)
+            return BusinessContext(**data)
+    
     def get_all_resources(self) -> Dict[str, Any]:
         """Get all loaded resources."""
         return {
@@ -163,5 +180,6 @@ class ProjectResourceManager:
             "agent_guidelines": self.load_agent_guidelines(),
             "component_index": self.load_component_index(),
             "infrastructure": self.load_infrastructure(),
+            "business_context": self.load_business_context(),
         }
 

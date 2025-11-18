@@ -49,6 +49,34 @@ class GPT4Formatter(ModelFormatter):
                     parts.append(f"- {constraint}\n")
             parts.append("\n")
         
+        # Business Context Artifacts (from indexed documents)
+        # Only include selected artifacts if available, otherwise include all
+        business_context_artifacts = []
+        if selected_context and selected_context.get("business_context_artifacts"):
+            business_context_artifacts = selected_context["business_context_artifacts"]
+        elif artifacts.business_context and artifacts.business_context.artifacts:
+            business_context_artifacts = artifacts.business_context.artifacts
+        
+        if business_context_artifacts:
+            parts.append("## Business Context Documentation\n")
+            parts.append("The following business context documents provide additional domain knowledge:\n\n")
+            
+            for artifact in business_context_artifacts:
+                # Read the markdown artifact file
+                try:
+                    from pathlib import Path
+                    artifact_path = Path(artifact.artifact_path)
+                    if artifact_path.exists():
+                        artifact_content = artifact_path.read_text(encoding='utf-8')
+                        parts.append(artifact_content)
+                        parts.append("\n\n---\n\n")
+                except Exception as e:
+                    # If we can't read the file, just include metadata
+                    parts.append(f"### {artifact.filename}\n")
+                    parts.append(f"*Source: {artifact.source_path}*\n")
+                    parts.append(f"*Type: {artifact.file_type.upper()}*\n\n")
+            parts.append("\n")
+        
         # System Description
         if artifacts.system_description:
             parts.append("## System Description\n")

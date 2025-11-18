@@ -6,10 +6,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..project_indexer import InfrastructureIndexer
+from ..project_indexer import InfrastructureIndexer, BusinessContextIndexer
 from ..project_resources import ProjectResourceManager
 from ..prompt_construction import PromptBuilder
-from ..types import AgentGuidelines, BusinessGoals, FeatureExample, SystemDescription
+from ..types import AgentGuidelines, BusinessGoals, FeatureExample, SystemDescription, BusinessContext, BusinessContextArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,17 @@ class FeatureExampleRequest(BaseModel):
     example: Optional[str] = None
 
 
+class BusinessContextIndexRequest(BaseModel):
+    """Request model for business context indexing endpoint."""
+    file_paths: List[str] = Field(..., description="List of file paths (local or S3 s3://bucket/key format)")
+    output_dir: Optional[str] = Field(None, description="Directory to save markdown artifacts (defaults to .project-resources/business-context)")
+    aws_access_key: Optional[str] = Field(None, description="AWS access key for S3 access")
+    aws_secret_key: Optional[str] = Field(None, description="AWS secret key for S3 access")
+    aws_region: Optional[str] = Field(None, description="AWS region")
+    api_key: Optional[str] = Field(None, description="OpenAI API key (if not in env)")
+    model: str = Field(default="gpt-4-turbo-preview", description="LLM model to use")
+
+
 class PromptRequest(BaseModel):
     """Request model for prompt generation."""
     feature_description: str = Field(..., description="Description of what to build/fix")
@@ -106,7 +117,9 @@ async def root():
         "endpoints": [
             "/index",
             "/index-infrastructure",
+            "/index-business-context",
             "/business-goals",
+            "/business-context",
             "/system-description",
             "/agent-guidelines",
             "/prompt",
@@ -143,6 +156,85 @@ async def index_project(request: IndexRequest):
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
+
+
+@app.post("/index-business-context")
+async def index_business_context(request: BusinessContextIndexRequest):
+    """
+    Index business context files (PDF, CSV, markdown) from local or S3 paths.
+    
+    Creates markdown index artifacts that can be injected into feature prompts
+    to provide necessary business context.
+    
+    Supports:
+    - Local file paths
+    - S3 paths (s3://bucket/key format)
+    - PDF, CSV, and markdown file types
+    """
+    try:
+        indexer = BusinessContextIndexer(
+            api_key=request.api_key,
+            model=request.model,
+            aws_access_key=request.aws_access_key,
+            aws_secret_key=request.aws_secret_key,
+            aws_region=request.aws_region
+        )
+        
+        result = indexer.index_business_context(
+            file_paths=request.file_paths,
+            output_dir=request.output_dir
+        )
+        
+        # Convert artifacts to BusinessContextArtifact objects
+        artifacts = [
+            BusinessContextArtifact(
+                filename=art["filename"],
+                file_type=art["file_type"],
+                source_path=art["source_path"],
+                artifact_path=art["artifact_path"],
+                indexed_at=result["indexed_at"]
+            )
+            for art in result["artifacts"]
+        ]
+        
+        # Create BusinessContext object
+        business_context = BusinessContext(
+            artifacts=artifacts,
+            indexed_at=result["indexed_at"]
+        )
+        
+        # Save business context to resources
+        resource_manager.save_business_context(business_context)
+        
+        return JSONResponse(content={
+            "status": "success",
+            "message": "Business context indexed successfully",
+            "result": {
+                "total_files": result["total_files"],
+                "successful": result["successful"],
+                "artifacts": [
+                    {
+                        "filename": art["filename"],
+                        "file_type": art["file_type"],
+                        "source_path": art["source_path"],
+                        "artifact_path": art["artifact_path"]
+                    }
+                    for art in result["artifacts"]
+                ],
+                "output_directory": result["output_directory"]
+            }
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Business context indexing failed: {str(e)}")
+
+
+@app.get("/business-context")
+async def get_business_context():
+    """Get current business context."""
+    business_context = resource_manager.load_business_context()
+    if not business_context:
+        raise HTTPException(status_code=404, detail="Business context not indexed")
+    return business_context.model_dump()
 
 
 @app.post("/index-infrastructure")
@@ -356,6 +448,7 @@ async def get_resources():
         "agent_guidelines": resources["agent_guidelines"].model_dump() if resources["agent_guidelines"] else None,
         "component_index": resources["component_index"].model_dump() if resources["component_index"] else None,
         "infrastructure": resources["infrastructure"].model_dump() if resources["infrastructure"] else None,
+        "business_context": resources["business_context"].model_dump() if resources["business_context"] else None,
     }
 
 

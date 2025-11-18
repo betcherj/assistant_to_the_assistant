@@ -121,6 +121,44 @@ The endpoint will automatically discover:
 
 Missing files are skipped gracefully. Terraform state files must be provided separately as they are typically stored remotely.
 
+#### 1b. Index Business Context (NEW)
+
+Index business context files (PDF, CSV, markdown) from local or S3 paths:
+
+```bash
+curl -X POST "http://localhost:8000/index-business-context" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "file_paths": [
+      "./docs/business-requirements.pdf",
+      "./data/customer-data.csv",
+      "s3://my-bucket/business-context/domain-knowledge.md"
+    ],
+    "aws_access_key": "your_aws_key",
+    "aws_secret_key": "your_aws_secret",
+    "aws_region": "us-east-1",
+    "model": "gpt-4-turbo-preview"
+  }'
+```
+
+The endpoint will:
+- Extract text from PDF files
+- Parse and summarize CSV files
+- Process markdown files
+- Create markdown index artifacts using LLM
+- Store artifacts in `.project-resources/business-context/`
+
+Supported file sources:
+- Local file paths (e.g., `./docs/file.pdf`)
+- S3 paths (e.g., `s3://bucket-name/path/to/file.csv`)
+
+Supported file types:
+- PDF (`.pdf`)
+- CSV (`.csv`)
+- Markdown (`.md`, `.markdown`)
+
+The generated markdown artifacts are automatically included in feature prompts to provide necessary business context.
+
 #### 2. Set Business Goals
 
 Define the business context:
@@ -220,7 +258,15 @@ The system will:
 3. **Optimize** the prompt for the target model type
 4. Return the optimized prompt along with metadata about the process
 
-#### 6. Get All Resources
+#### 6. Get Business Context
+
+Retrieve indexed business context:
+
+```bash
+curl "http://localhost:8000/business-context"
+```
+
+#### 7. Get All Resources
 
 Retrieve all stored project resources:
 

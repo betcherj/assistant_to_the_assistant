@@ -92,11 +92,33 @@ class FeaturePrompt(BaseModel):
     )
 
 
+class BusinessContextArtifact(BaseModel):
+    """A business context artifact from indexed documents."""
+    filename: str = Field(..., description="Original filename")
+    file_type: str = Field(..., description="File type: pdf, csv, markdown")
+    source_path: str = Field(..., description="Source path (local or S3)")
+    artifact_path: str = Field(..., description="Path to markdown artifact file")
+    indexed_at: str = Field(..., description="ISO timestamp when indexed")
+
+
+class BusinessContext(BaseModel):
+    """Business context from indexed documents."""
+    artifacts: List[BusinessContextArtifact] = Field(
+        default_factory=list,
+        description="List of business context artifacts"
+    )
+    indexed_at: str = Field(..., description="ISO timestamp when indexed")
+
+
 class PromptArtifacts(BaseModel):
     """Complete prompt artifacts collection."""
     business_goals: BusinessGoals
     system_description: SystemDescription
     agent_guidelines: AgentGuidelines
     feature_prompt: FeaturePrompt
+    business_context: Optional[BusinessContext] = Field(
+        None,
+        description="Business context from indexed documents"
+    )
 
 

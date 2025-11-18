@@ -11,15 +11,24 @@ The prompt construction system uses a two-stage LLM-powered pipeline to create o
 
 ### Classification Stage
 
-The `PromptClassifier` uses an LLM to:
-- Analyze feature descriptions
-- Identify relevant components from the codebase
-- Select relevant infrastructure sections
-- Determine which guidelines and constraints to include
-- Classify feature complexity and category
+The `PromptClassifier` uses an LLM as a judge to analyze feature descriptions and intelligently select relevant artifacts. The goal is to **maximize prompt effectiveness** by including only the most relevant context.
+
+The classifier analyzes:
+- **Components**: Codebase components directly involved in the feature
+- **Infrastructure Sections**: Relevant deployment, storage, networking, or CI/CD sections
+- **Business Context Artifacts**: Indexed business context documents (PDF, CSV, markdown) that contain domain knowledge needed for the feature
+- **Business Goals**: Whether business purpose and constraints are relevant
+- **Agent Guidelines**: Whether development guidelines are needed
+- **System IO Examples**: Whether system-level examples are helpful
+
+**Selection Criteria**:
+- Relevance to the feature description
+- Direct contribution to implementation
+- Balance between context and prompt length (too much context reduces effectiveness)
+- Relevance scores for prioritization
 
 **Input**: Feature description + all available artifacts  
-**Output**: Selected artifacts with reasoning
+**Output**: Selected artifacts with reasoning and relevance scores
 
 ### Optimization Stage
 
@@ -113,11 +122,17 @@ When `return_metadata` is `true`, the API returns:
     "classification": {
       "relevant_component_names": ["auth", "api"],
       "relevant_infrastructure_sections": ["CI/CD Pipeline"],
+      "relevant_business_context_filenames": ["user-requirements.pdf", "auth-specs.md"],
       "include_business_goals": true,
       "include_agent_guidelines": true,
-      "reasoning": "Authentication feature requires...",
+      "reasoning": "Authentication feature requires user domain knowledge and API patterns...",
       "feature_category": "api",
-      "complexity": "medium"
+      "complexity": "medium",
+      "relevance_scores": {
+        "components": {"auth": 0.9, "api": 0.8},
+        "infrastructure": {"CI/CD Pipeline": 0.7},
+        "business_context": {"user-requirements.pdf": 0.9, "auth-specs.md": 0.85}
+      }
     },
     "initial_prompt": "Initial prompt before optimization..."
   }
@@ -126,13 +141,18 @@ When `return_metadata` is `true`, the API returns:
 
 ## Classification Details
 
-The classifier analyzes:
-- **Components**: Which codebase components are relevant
-- **Infrastructure**: Which infrastructure sections apply
-- **Business Goals**: Whether business context is needed
-- **Guidelines**: Which coding standards apply
+The classifier analyzes and selects:
+- **Components**: Which codebase components are directly involved in the feature
+- **Infrastructure Sections**: Which infrastructure sections (deployment, storage, networking, CI/CD) are relevant
+- **Business Context Artifacts**: Which indexed business context documents (PDF, CSV, markdown) contain domain knowledge needed for the feature
+- **Business Goals**: Whether business purpose and constraints are relevant
+- **Agent Guidelines**: Whether development guidelines are needed
+- **System IO Examples**: Whether system-level examples would be helpful
 - **Feature Category**: api, database, ui, infrastructure, integration, other
 - **Complexity**: low, medium, high
+- **Relevance Scores**: Numerical scores (0.0-1.0) indicating relevance of each selected artifact
+
+The classifier uses an LLM judge to maximize prompt effectiveness by selecting only the most relevant artifacts. Artifacts with relevance scores below 0.5 are typically excluded unless explicitly relevant.
 
 ## Optimization Details
 

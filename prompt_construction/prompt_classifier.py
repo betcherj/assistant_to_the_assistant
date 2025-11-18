@@ -13,6 +13,8 @@ from ..types import (
     BusinessGoals,
     SystemDescription,
     AgentGuidelines,
+    BusinessContext,
+    BusinessContextArtifact,
 )
 
 load_dotenv()
@@ -86,6 +88,7 @@ class PromptClassifier:
             "business_goals": None,
             "agent_guidelines": None,
             "system_io_examples": [],
+            "business_context_artifacts": [],
         }
         
         # Extract component summaries
@@ -143,6 +146,13 @@ class PromptClassifier:
                 for io_ex in system_description.io_examples
             ]
         
+        # Extract business context artifacts
+        business_context = resources.get("business_context")
+        if business_context and business_context.artifacts:
+            context["business_context_artifacts"] = self._prepare_business_context_summaries(
+                business_context.artifacts
+            )
+        
         return context
     
     def _llm_classify(
@@ -162,8 +172,11 @@ class PromptClassifier:
                     {
                         "role": "system",
                         "content": "You are an expert at analyzing software feature requirements and identifying "
-                                   "relevant context needed for implementation. Analyze the feature description "
-                                   "and select only the most relevant artifacts that would help implement this feature."
+                                   "relevant context needed for implementation. Your goal is to maximize the effectiveness "
+                                   "of the final prompt by selecting only the most relevant artifacts that directly "
+                                   "contribute to implementing the feature. Be selective - include only artifacts that "
+                                   "provide essential context. Too much irrelevant context can reduce prompt effectiveness. "
+                                   "Consider relevance scores to prioritize the most important artifacts."
                     },
                     {
                         "role": "user",
@@ -228,7 +241,26 @@ Development Guidelines:
 - Coding Standards: {len(context['agent_guidelines']['coding_standards'])} standards
 """
         
+        business_context_summary = ""
+        if context["business_context_artifacts"]:
+            bc_list = "\n".join([
+                f"- {art['filename']} ({art['file_type']}): {art['summary']}"
+                for art in context["business_context_artifacts"]
+            ])
+            business_context_summary = f"""
+Available Business Context Documents:
+{bc_list}
+"""
+        
         return f"""Analyze the following feature description and determine which artifacts are most relevant for implementation.
+
+Your goal is to maximize the effectiveness of the final prompt by selecting only the most relevant artifacts that directly contribute to implementing this feature. Be selective - too much context can reduce prompt effectiveness.
+
+Consider:
+- Which components are directly involved in implementing this feature?
+- Which infrastructure sections are relevant to deployment/configuration?
+- Which business context documents contain domain knowledge needed for this feature?
+- Which guidelines and constraints are most important for this specific feature?
 
 Feature Description:
 {feature_description}
@@ -238,17 +270,24 @@ Available Artifacts:
 {infrastructure_summary}
 {business_goals_summary}
 {guidelines_summary}
+{business_context_summary}
 
 Return a JSON object with:
 {{
   "relevant_component_names": ["component1", "component2", ...],
   "relevant_infrastructure_sections": ["section_title1", "section_title2", ...],
+  "relevant_business_context_filenames": ["filename1.pdf", "filename2.csv", ...],
   "include_business_goals": true/false,
   "include_agent_guidelines": true/false,
   "include_system_io_examples": true/false,
-  "reasoning": "Brief explanation of why these artifacts were selected",
+  "reasoning": "Brief explanation of why these artifacts were selected and how they maximize prompt effectiveness",
   "feature_category": "api|database|ui|infrastructure|integration|other",
-  "complexity": "low|medium|high"
+  "complexity": "low|medium|high",
+  "relevance_scores": {{
+    "components": {{"component1": 0.9, "component2": 0.7}},
+    "infrastructure": {{"section1": 0.8}},
+    "business_context": {{"filename1.pdf": 0.9, "filename2.csv": 0.5}}
+  }}
 }}
 """
     
@@ -261,6 +300,7 @@ Return a JSON object with:
         selected = {
             "components": [],
             "infrastructure_sections": [],
+            "business_context_artifacts": [],
             "include_business_goals": classification.get("include_business_goals", True),
             "include_agent_guidelines": classification.get("include_agent_guidelines", True),
             "include_system_io_examples": classification.get("include_system_io_examples", False),
@@ -285,6 +325,20 @@ Return a JSON object with:
                     section for section in infrastructure.sections
                     if section.title in relevant_titles
                 ]
+        
+        # Select business context artifacts
+        business_context = resources.get("business_context")
+        if business_context and business_context.artifacts:
+            relevant_filenames = classification.get("relevant_business_context_filenames", [])
+            # Use relevance scores if available to filter low-relevance artifacts
+            relevance_scores = classification.get("relevance_scores", {}).get("business_context", {})
+            min_relevance = 0.5  # Minimum relevance score threshold
+            
+            selected["business_context_artifacts"] = [
+                artifact for artifact in business_context.artifacts
+                if artifact.filename in relevant_filenames or 
+                relevance_scores.get(artifact.filename, 0) >= min_relevance
+            ]
         
         return selected
     
@@ -313,14 +367,85 @@ Return a JSON object with:
                 if any(kw in section_text for kw in keywords if len(kw) > 3):
                     relevant_sections.append(section["title"])
         
+        # Fallback business context selection
+        relevant_bc = []
+        if context.get("business_context_artifacts"):
+            for bc_art in context["business_context_artifacts"]:
+                bc_text = f"{bc_art['filename']} {bc_art['summary']}".lower()
+                if any(kw in bc_text for kw in keywords if len(kw) > 3):
+                    relevant_bc.append(bc_art["filename"])
+        
         return {
             "relevant_component_names": relevant_components[:5],
             "relevant_infrastructure_sections": relevant_sections[:3],
+            "relevant_business_context_filenames": relevant_bc[:3],
             "include_business_goals": True,
             "include_agent_guidelines": True,
             "include_system_io_examples": False,
             "reasoning": "Fallback classification using keyword matching",
             "feature_category": "other",
-            "complexity": "medium"
+            "complexity": "medium",
+            "relevance_scores": {}
         }
+    
+    def _prepare_business_context_summaries(
+        self,
+        artifacts: List[BusinessContextArtifact]
+    ) -> List[Dict[str, Any]]:
+        """
+        Prepare business context artifact summaries for classification.
+        
+        Reads the markdown artifact files and extracts summaries.
+        """
+        summaries = []
+        
+        for artifact in artifacts:
+            try:
+                from pathlib import Path
+                artifact_path = Path(artifact.artifact_path)
+                
+                if artifact_path.exists():
+                    # Read the artifact file
+                    content = artifact_path.read_text(encoding='utf-8')
+                    
+                    # Extract summary (first 800 chars or first section)
+                    # Try to get the overview section if it exists
+                    summary = content[:800] + "..." if len(content) > 800 else content
+                    
+                    # Try to extract overview section if present
+                    if "## Overview" in content or "**Overview**" in content:
+                        overview_start = content.find("## Overview") or content.find("**Overview**")
+                        overview_end = content.find("\n##", overview_start + 10) or content.find("\n**", overview_start + 10)
+                        if overview_end > overview_start:
+                            summary = content[overview_start:overview_end]
+                    
+                    summaries.append({
+                        "filename": artifact.filename,
+                        "file_type": artifact.file_type,
+                        "source_path": artifact.source_path,
+                        "summary": summary,
+                        "artifact_path": artifact.artifact_path
+                    })
+                else:
+                    # If file doesn't exist, just include metadata
+                    summaries.append({
+                        "filename": artifact.filename,
+                        "file_type": artifact.file_type,
+                        "source_path": artifact.source_path,
+                        "summary": f"Business context document: {artifact.filename}",
+                        "artifact_path": artifact.artifact_path
+                    })
+                    
+            except Exception as e:
+                logger.warning(f"Error reading business context artifact {artifact.filename}: {e}")
+                # Include with minimal info
+                summaries.append({
+                    "filename": artifact.filename,
+                    "file_type": artifact.file_type,
+                    "source_path": artifact.source_path,
+                    "summary": f"Business context document: {artifact.filename}",
+                    "artifact_path": artifact.artifact_path
+                })
+        
+        return summaries
 
