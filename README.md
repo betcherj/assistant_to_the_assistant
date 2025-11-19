@@ -7,9 +7,12 @@ A framework for writing prompts that improve accuracy and save developer time wh
 ## Features
 
 - **Project Indexing**: Automatically index codebases, infrastructure, databases, and contextual documents using LLM to create natural language descriptions
-- **Smart Context Selection**: Dynamically select relevant context based on feature descriptions
+- **LLM-Based Classification**: Intelligently select relevant artifacts (components, infrastructure, business context) using LLM analysis
+- **Smart Context Selection**: Dynamically select relevant context based on feature descriptions with keyword matching fallback
+- **Prompt Optimization**: Optimize prompts for specific model types (GPT-4, Claude, etc.) using LLM-based optimization
 - **Model-Specific Formatting**: Format prompts optimized for different LLM models (GPT-4, Claude, etc.)
-- **Resource Management**: Store and manage project-specific resources (business goals, system descriptions, agent guidelines)
+- **Resource Management**: Store and manage project-specific resources (business goals, system descriptions, agent guidelines) with unified save/load methods
+- **Shared Utilities**: Reusable utilities for LLM calls, keyword extraction, and file operations
 - **RESTful API**: FastAPI-based endpoints for easy integration
 
 ## Project Structure
@@ -17,10 +20,29 @@ A framework for writing prompts that improve accuracy and save developer time wh
 ```
 assistant_to_the_assistant/
 ├── project_indexer/       # Functions to index codebases, infra, databases, and documents
+│   ├── indexer.py         # Main project indexer using LLM
+│   ├── infrastructure_indexer.py  # Infrastructure file indexing
+│   ├── business_context_indexer.py  # Business document indexing (PDF, CSV, markdown)
+│   └── ...
 ├── project_resources/     # Project-specific resources (manually defined or created by indexer)
+│   ├── resource_manager.py  # Manages storage and retrieval of project resources
+│   └── storage.py          # Storage utilities
 ├── types/                 # Pydantic types for type validation and component objects
+│   ├── components.py      # Component and ComponentIndex types
+│   └── prompt_artifacts.py  # Prompt artifact types (BusinessGoals, SystemDescription, etc.)
 ├── prompt_construction/   # Combines project info and business context to create formatted prompts
+│   ├── prompt_builder.py  # Main prompt builder with classification and optimization
+│   ├── prompt_classifier.py  # LLM-based artifact selection
+│   ├── prompt_optimizer.py   # LLM-based prompt optimization
+│   ├── context_selector.py   # Context selection utilities
+│   └── model_formatters.py   # Model-specific prompt formatters
+├── utils/                 # Shared utilities and base classes
+│   ├── llm_client.py      # BaseLLMClient and LLM API call utilities
+│   ├── keyword_extractor.py  # Keyword extraction utilities
+│   ├── file_utils.py      # File reading utilities
+│   └── logging_config.py  # Logging configuration
 ├── entry_point/           # FastAPI endpoints for interaction
+│   └── api.py             # REST API endpoints
 └── main.py                # Application entry point
 ```
 
@@ -68,6 +90,110 @@ cp .env.example .env
 ```
 
 ## Usage
+
+### CLI Commands
+
+The framework provides a command-line interface for managing project resources and generating prompts using YAML configuration files.
+
+#### Installation
+
+After installing the package, the CLI is available as `assistant-cli`:
+
+```bash
+pip install -e .
+assistant-cli --help
+```
+
+#### Setting Business Goals from YAML
+
+Set business goals using the default YAML file from the repo, or provide a custom path:
+
+```bash
+# Use default from examples/business_goals.yaml
+assistant-cli set-business-goals
+
+# Or specify a custom YAML file
+assistant-cli set-business-goals path/to/custom_business_goals.yaml
+```
+
+The default YAML file (`examples/business_goals.yaml`) contains:
+```yaml
+purpose: |
+  Build a REST API for managing user accounts with authentication and authorization.
+
+external_constraints:
+  - Must comply with GDPR regulations
+  - Must support 10k concurrent users
+```
+
+#### Setting Agent Guidelines from YAML
+
+Set agent guidelines using the default YAML file, or provide a custom path:
+
+```bash
+# Use default from examples/agent_guidelines.yaml
+assistant-cli set-agent-guidelines
+
+# Or specify a custom YAML file
+assistant-cli set-agent-guidelines path/to/custom_guidelines.yaml
+```
+
+The default YAML file (`examples/agent_guidelines.yaml`) contains guardrails, best practices, and coding standards.
+
+#### Setting System Description from YAML
+
+Set system description using the default YAML file, or provide a custom path:
+
+```bash
+# Use default from examples/system_description.yaml
+assistant-cli set-system-description
+
+# Or specify a custom YAML file
+assistant-cli set-system-description path/to/custom_system_description.yaml
+```
+
+#### Generating Prompts from YAML
+
+Generate prompts using the default feature specification YAML file, or provide a custom path:
+
+```bash
+# Use default from examples/feature_spec.yaml
+assistant-cli generate-prompt
+
+# Or specify a custom YAML file
+assistant-cli generate-prompt path/to/custom_feature_spec.yaml
+```
+
+The default feature specification YAML (`examples/feature_spec.yaml`) contains a sample feature request for user authentication.
+
+#### Indexing Operations
+
+Index project codebase:
+```bash
+assistant-cli index-project \
+  --codebase-paths ./src ./lib \
+  --config-paths ./config.yaml \
+  --model gpt-4-turbo-preview
+```
+
+Index infrastructure:
+```bash
+assistant-cli index-infrastructure \
+  --repo-url https://gitlab.com/your-org/your-project \
+  --repo-token your_token \
+  --model gpt-4-turbo-preview
+```
+
+Index business context:
+```bash
+assistant-cli index-business-context \
+  --file-paths ./docs/requirements.pdf s3://bucket/data.csv \
+  --aws-access-key your_key \
+  --aws-secret-key your_secret \
+  --aws-region us-east-1
+```
+
+See `examples/README.md` for detailed YAML file structures and more examples.
 
 ### Starting the API Server
 
@@ -279,13 +405,17 @@ curl "http://localhost:8000/resources"
 You can also use the framework programmatically:
 
 ```python
-from project_resources import ProjectResourceManager
-from prompt_construction import PromptBuilder
-from types import BusinessGoals, AgentGuidelines
+from assistant_to_the_assistant.project_resources import ProjectResourceManager
+from assistant_to_the_assistant.prompt_construction import PromptBuilder
+from assistant_to_the_assistant.types import BusinessGoals, AgentGuidelines
 
 # Initialize managers
 resource_manager = ProjectResourceManager()
-prompt_builder = PromptBuilder(resource_manager)
+prompt_builder = PromptBuilder(
+    resource_manager=resource_manager,
+    use_classifier=True,  # Enable LLM-based artifact selection
+    use_optimizer=True    # Enable LLM-based prompt optimization
+)
 
 # Set business goals
 business_goals = BusinessGoals(
@@ -301,28 +431,34 @@ resource_manager.index_project(
     model="gpt-4-turbo-preview"
 )
 
-# Generate prompt
-prompt = prompt_builder.build_prompt(
+# Generate prompt with automatic classification and optimization
+result = prompt_builder.build_prompt(
     feature_description="Add user authentication endpoint",
     feature_type="feature",
     model="gpt-4-turbo-preview",
-    include_all_context=False
+    include_all_context=False,  # Use LLM-based selection
+    enable_classification=True,  # Enable artifact classification
+    enable_optimization=True     # Enable prompt optimization
 )
 
-print(prompt)
+print(result["prompt"])  # Optimized prompt
+print(result["classification"])  # Classification metadata
+print(result["optimized"])  # Whether optimization was applied
 ```
 
 ## How It Works
 
-1. **Indexing Phase**: The project indexer analyzes your codebase using LLM to create natural language descriptions of components and how they fit into the larger system.
+1. **Indexing Phase**: The project indexer analyzes your codebase using LLM to create natural language descriptions of components and how they fit into the larger system. Infrastructure files and business context documents are also indexed.
 
-2. **Resource Storage**: Project-specific resources (business goals, system descriptions, agent guidelines) are stored and can be manually defined or auto-generated.
+2. **Resource Storage**: Project-specific resources (business goals, system descriptions, agent guidelines) are stored using a unified resource management system with generic save/load methods.
 
-3. **Context Selection**: When generating a prompt, the system intelligently selects relevant components and context based on the feature description.
+3. **LLM-Based Classification**: When generating a prompt, the system uses an LLM classifier to intelligently select relevant artifacts (components, infrastructure sections, business context documents) based on the feature description, maximizing prompt effectiveness.
 
-4. **Prompt Construction**: The prompt builder combines all relevant information into a model-specific formatted prompt.
+4. **Prompt Construction**: The prompt builder combines all selected information into a model-specific formatted prompt using specialized formatters.
 
-5. **Model Selection**: The framework supports different LLM models and formats prompts accordingly.
+5. **Prompt Optimization**: The system can optionally optimize prompts for specific model types (GPT-4, Claude, etc.) using LLM-based optimization to maximize performance.
+
+6. **Model Selection**: The framework supports different LLM models and formats prompts accordingly using model-specific formatters.
 
 ## Configuration
 
@@ -343,19 +479,64 @@ pytest
 
 ### Project Structure Details
 
-- **project-indexer**: Uses LLM to analyze codebase and create component summaries
-- **project-resources**: Manages storage and retrieval of project resources
+- **project_indexer**: Uses LLM to analyze codebase and create component summaries
+  - `ProjectIndexer`: Main codebase indexing using LLM analysis
+  - `InfrastructureIndexer`: Parses and indexes infrastructure files (Docker, Terraform, CI/CD, etc.)
+  - `BusinessContextIndexer`: Indexes business documents (PDF, CSV, markdown) from local or S3 paths
+
+- **project_resources**: Manages storage and retrieval of project resources
+  - `ProjectResourceManager`: Centralized resource management with generic save/load methods
+
 - **types**: Pydantic models for type safety and validation
-- **prompt-construction**: Builds formatted prompts with smart context selection
-- **entry-point**: FastAPI REST API for easy integration
+  - `Component`, `ComponentIndex`: Codebase component types
+  - `BusinessGoals`, `SystemDescription`, `AgentGuidelines`: Prompt artifact types
+  - `BaseIOExample`: Base type for input/output examples (shared by `SystemIOExample` and `FeatureExample`)
+
+- **prompt_construction**: Builds formatted prompts with smart context selection
+  - `PromptBuilder`: Main builder with LLM-based classification and optimization
+  - `PromptClassifier`: Uses LLM to intelligently select relevant artifacts
+  - `PromptOptimizer`: Optimizes prompts for specific model types
+  - `ModelFormatter`: Base formatter with `GPT4Formatter` and `ClaudeFormatter` implementations
+
+- **utils**: Shared utilities and base classes
+  - `BaseLLMClient`: Base class for all LLM-based clients (reduces code duplication)
+  - `make_llm_call()`, `make_json_llm_call()`: Standardized LLM API call utilities
+  - `extract_keywords()`, `matches_keywords()`: Keyword extraction utilities
+  - `read_business_context_artifact()`, `get_artifact_summary()`: File reading utilities
+
+- **entry_point**: FastAPI REST API for easy integration
+
+## Architecture Highlights
+
+### Code Organization
+
+The codebase follows DRY (Don't Repeat Yourself) principles with shared utilities:
+
+- **BaseLLMClient**: All LLM-based classes (`PromptClassifier`, `PromptOptimizer`, `InfrastructureIndexer`, `BusinessContextIndexer`) inherit from this base class, eliminating duplicate OpenAI initialization code.
+
+- **Shared Utilities**: Common patterns are extracted into reusable utilities:
+  - `make_llm_call()` and `make_json_llm_call()`: Standardized LLM API calls with error handling
+  - `extract_keywords()` and `matches_keywords()`: Consistent keyword extraction across components
+  - `read_business_context_artifact()`: Unified file reading for business context artifacts
+
+- **Type Reuse**: `BaseIOExample` provides a shared base for `SystemIOExample` and `FeatureExample`, reducing duplication.
+
+- **Generic Resource Management**: `ProjectResourceManager` uses generic `_save_resource()` and `_load_resource()` methods, eliminating repetitive save/load code.
+
+### Benefits
+
+- **Reduced Code Duplication**: ~200+ lines of duplicate code eliminated
+- **Improved Maintainability**: Changes to common patterns only need to be made once
+- **Better Consistency**: All classes use the same utilities, ensuring consistent behavior
+- **Easier Testing**: Utilities can be tested independently
 
 ## Future Enhancements
 
-- Add ability to refine prompts with target model as a judge
 - Enhanced context selection using semantic similarity
 - Support for more LLM providers (Anthropic, etc.)
 - Classification system to balance performance/cost with model selection
 - Web UI for easier interaction
+- Additional model-specific optimizations
 
 ## License
 

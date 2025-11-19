@@ -2,8 +2,8 @@
 import logging
 import uvicorn
 
-from entry_point.api import app
-from utils.logging_config import setup_logging
+from assistant_to_the_assistant.entry_point.api import app
+from assistant_to_the_assistant.utils.logging_config import setup_logging
 
 # Set up logging
 setup_logging(level=logging.INFO)

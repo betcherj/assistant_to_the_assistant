@@ -85,8 +85,8 @@ curl -X POST "http://localhost:8000/prompt" \
 ### Python API
 
 ```python
-from prompt_construction import PromptBuilder
-from project_resources import ProjectResourceManager
+from assistant_to_the_assistant.prompt_construction import PromptBuilder
+from assistant_to_the_assistant.project_resources import ProjectResourceManager
 
 resource_manager = ProjectResourceManager()
 prompt_builder = PromptBuilder(

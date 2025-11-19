@@ -129,8 +129,8 @@ If a feature description mentions "deploy new container", the system will automa
 ## Python API Usage
 
 ```python
-from project_indexer import InfrastructureIndexer
-from project_resources import ProjectResourceManager
+from assistant_to_the_assistant.project_indexer import InfrastructureIndexer
+from assistant_to_the_assistant.project_resources import ProjectResourceManager
 
 # Initialize indexer
 indexer = InfrastructureIndexer(

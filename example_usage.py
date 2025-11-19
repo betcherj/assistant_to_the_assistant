@@ -1,7 +1,7 @@
 """Example usage of Assistant to the Assistant framework."""
-from project_resources import ProjectResourceManager
-from prompt_construction import PromptBuilder
-from types import BusinessGoals, AgentGuidelines
+from assistant_to_the_assistant.project_resources import ProjectResourceManager
+from assistant_to_the_assistant.prompt_construction import PromptBuilder
+from assistant_to_the_assistant.types import BusinessGoals, AgentGuidelines
 
 def main():
     """Example usage."""
