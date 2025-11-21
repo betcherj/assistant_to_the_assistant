@@ -1,0 +1,64 @@
+# Feature Specification for ETL Repository
+# This describes a feature request for the ETL system
+
+feature_description: |
+  Add support for extracting order information from email attachments.
+  The system should be able to process PDF and plain text email attachments,
+  extract order details using the LLM-based parser, and validate the extracted
+  Pydantic Order model against business rules. The feature should handle
+  domain-specific terminology like "PO", "SKU", "FOB", and "Net 30" correctly.
+  Extracted orders should be stored with confidence scores and validation status.
+
+feature_type: feature  # Options: feature, fix, instance
+
+model: gpt-4-turbo-preview  # Target LLM model
+
+# Context selection options
+include_all_context: false  # If true, includes all context; if false, uses intelligent selection
+enable_classification: true  # Enable LLM-based artifact classification
+enable_optimization: true    # Enable LLM-based prompt optimization
+
+# Feature-level examples
+feature_examples:
+  - input_description: "Email attachment (PDF) containing order details"
+    output_description: "Validated Pydantic Order model with extracted fields"
+    example: |
+      Input: Email attachment with PDF containing:
+      "Purchase Order #12345
+       Customer: Acme Corp
+       Order Date: 2024-01-15
+       Items:
+       - SKU: ABC-123, Quantity: 10, Price: $25.00
+       - SKU: XYZ-789, Quantity: 5, Price: $50.00
+       Shipping: FOB Origin, Net 30
+       ETA: 2024-02-01"
+      
+      Output: {
+        "order_id": "12345",
+        "customer": {
+          "name": "Acme Corp",
+          "reference": "ACME-REF-001"
+        },
+        "order_date": "2024-01-15",
+        "line_items": [
+          {
+            "sku": "ABC-123",
+            "quantity": 10,
+            "unit_price": 25.00
+          },
+          {
+            "sku": "XYZ-789",
+            "quantity": 5,
+            "unit_price": 50.00
+          }
+        ],
+        "shipping_terms": "FOB Origin",
+        "payment_terms": "Net 30",
+        "estimated_arrival": "2024-02-01",
+        "confidence_score": 0.95,
+        "validation_status": "valid"
+      }
+
+# Optional: Output file to save the generated prompt
+output_file: evals/etl_scenario/generated_prompt.md
+

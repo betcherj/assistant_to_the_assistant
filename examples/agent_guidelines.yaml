@@ -1,0 +1,28 @@
+# Agent Guidelines Configuration
+# This file defines coding standards, best practices, and guardrails for LLM-generated code
+
+guardrails:
+  - Never commit API keys, secrets, or credentials to code
+  - Always validate and sanitize user input
+  - Never execute user-provided code or SQL without proper sanitization
+  - Always use parameterized queries for database operations
+  - Never expose sensitive information in error messages or logs
+
+best_practices:
+  - Use type hints for all function parameters and return types
+  - Write docstrings for all functions, classes, and modules
+  - Follow PEP 8 style guide
+  - Use meaningful variable and function names
+  - Keep functions small and focused (single responsibility principle)
+  - Write unit tests for all new functionality
+  - Use dependency injection for better testability
+
+coding_standards:
+  - Use async/await for I/O operations
+  - Return Pydantic models from API endpoints
+  - Use environment variables for configuration
+  - Implement proper error handling with custom exceptions
+  - Use logging instead of print statements
+  - Follow RESTful API conventions
+  - Use database migrations for schema changes
+

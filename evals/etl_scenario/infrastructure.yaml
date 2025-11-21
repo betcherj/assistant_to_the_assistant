@@ -1,0 +1,173 @@
+# Infrastructure Description for ETL Repository
+# This describes the infrastructure setup for the ETL system
+
+deployment: |
+  The ETL system is deployed as containerized microservices on AWS ECS Fargate.
+  Services are orchestrated using Docker Compose for local development and
+  AWS ECS Task Definitions for production. The system uses AWS Lambda for
+  event-driven processing of incoming documents.
+
+databases:
+  - PostgreSQL: Primary database for storing extracted Pydantic models and metadata
+  - Redis: Caching layer for frequently accessed order data and LLM responses
+  - S3: Object storage for raw documents and processed artifacts
+
+services:
+  - LLM API Service: OpenAI API for natural language processing
+  - Document Processing Service: Handles PDF parsing and text extraction
+  - Order Validation Service: Validates extracted orders against business rules
+  - Notification Service: Sends alerts for high-priority orders
+
+# Infrastructure sections (structured markdown sections)
+sections:
+  - title: "CI/CD Pipeline"
+    section_type: "cicd"
+    content: |
+      ## CI/CD Pipeline
+      
+      The system uses GitLab CI/CD for automated testing and deployment.
+      
+      **Pipeline Stages:**
+      1. **Build**: Compiles Python code and builds Docker images
+      2. **Test**: Runs unit tests, integration tests, and LLM response validation tests
+      3. **Deploy**: Deploys to staging environment for validation
+      4. **Production**: Deploys to production ECS cluster after approval
+      
+      **Key Jobs:**
+      - `build`: Builds Docker images for all services
+      - `test`: Runs pytest suite with coverage reporting
+      - `lint`: Runs code quality checks (black, flake8, mypy)
+      - `deploy-staging`: Deploys to staging ECS cluster
+      - `deploy-prod`: Deploys to production ECS cluster (manual approval required)
+      
+      **Artifacts:**
+      - Docker images stored in AWS ECR
+      - Test coverage reports stored as GitLab artifacts
+      
+    keywords: ["cicd", "gitlab", "pipeline", "deployment", "docker"]
+  
+  - title: "Deployment Infrastructure"
+    section_type: "deployment"
+    content: |
+      ## Deployment Infrastructure
+      
+      **Containerization:**
+      - All services are containerized using Docker
+      - Base image: Python 3.11-slim
+      - Multi-stage builds for optimized image sizes
+      
+      **Orchestration:**
+      - **Production**: AWS ECS Fargate with auto-scaling
+        - Task CPU: 1024 (1 vCPU)
+        - Task Memory: 2048 MB
+        - Desired count: 2-10 tasks (auto-scales based on queue depth)
+      - **Staging**: Single ECS Fargate task
+      - **Local**: Docker Compose with all services
+      
+      **Resource Allocation:**
+      - Document Processing Service: 2 vCPU, 4GB RAM
+      - LLM API Service: 1 vCPU, 2GB RAM
+      - Order Validation Service: 1 vCPU, 2GB RAM
+      
+      **Scaling Configuration:**
+      - Auto-scaling based on SQS queue depth
+      - Scale up when queue depth > 100 messages
+      - Scale down when queue depth < 10 messages
+      - Maximum 10 tasks per service
+      
+      **Environment Configuration:**
+      - Environment variables managed via AWS Systems Manager Parameter Store
+      - Secrets managed via AWS Secrets Manager
+      - Configuration files stored in S3 and mounted as volumes
+      
+    keywords: ["deployment", "docker", "ecs", "fargate", "aws", "containers"]
+  
+  - title: "Compute Resources"
+    section_type: "compute"
+    content: |
+      ## Compute Resources
+      
+      **ECS Clusters:**
+      - `etl-production`: Production ECS cluster with Fargate launch type
+      - `etl-staging`: Staging ECS cluster with Fargate launch type
+      
+      **Task Definitions:**
+      - `etl-document-processor`: Processes incoming documents
+      - `etl-llm-service`: Handles LLM API calls and response parsing
+      - `etl-order-validator`: Validates extracted order data
+      - `etl-notification-service`: Sends notifications and alerts
+      
+      **Lambda Functions:**
+      - `process-document`: Triggered by S3 uploads, initiates document processing
+      - `validate-order`: Validates orders after extraction
+      - `send-notification`: Sends notifications for high-priority orders
+      
+      **Resource Dependencies:**
+      - ECS tasks depend on RDS PostgreSQL for data storage
+      - ECS tasks depend on ElastiCache Redis for caching
+      - Lambda functions depend on S3 for document storage
+      
+    keywords: ["compute", "ecs", "lambda", "fargate", "aws"]
+  
+  - title: "Storage Infrastructure"
+    section_type: "storage"
+    content: |
+      ## Storage Infrastructure
+      
+      **PostgreSQL Database (RDS):**
+      - Engine: PostgreSQL 15.4
+      - Instance: db.t3.medium (2 vCPU, 4GB RAM)
+      - Multi-AZ deployment for high availability
+      - Automated backups with 7-day retention
+      - Stores extracted Pydantic models, metadata, and audit logs
+      
+      **Redis Cache (ElastiCache):**
+      - Engine: Redis 7.0
+      - Node type: cache.t3.micro
+      - Cluster mode disabled
+      - TTL: 1 hour for cached LLM responses
+      - TTL: 24 hours for cached order data
+      
+      **S3 Buckets:**
+      - `etl-raw-documents`: Stores incoming raw documents (PDFs, text files)
+      - `etl-processed-artifacts`: Stores processed documents and extraction results
+      - `etl-archive`: Long-term archive for completed processing jobs
+      - Lifecycle policies: Move to Glacier after 90 days, delete after 1 year
+      
+      **Data Persistence:**
+      - All extracted orders are persisted to PostgreSQL
+      - Raw documents are retained in S3 for 90 days
+      - Processed artifacts are retained for 1 year
+      
+    keywords: ["storage", "s3", "rds", "postgresql", "redis", "aws"]
+  
+  - title: "Networking Infrastructure"
+    section_type: "networking"
+    content: |
+      ## Networking Infrastructure
+      
+      **VPC Configuration:**
+      - VPC CIDR: 10.0.0.0/16
+      - Public subnets: 10.0.1.0/24, 10.0.2.0/24 (for load balancers)
+      - Private subnets: 10.0.10.0/24, 10.0.11.0/24 (for ECS tasks)
+      - Database subnets: 10.0.20.0/24, 10.0.21.0/24 (for RDS)
+      
+      **Security Groups:**
+      - ECS tasks: Allow inbound from ALB on port 8000, outbound to RDS (5432), Redis (6379), S3
+      - RDS: Allow inbound from ECS security group on port 5432
+      - Redis: Allow inbound from ECS security group on port 6379
+      - ALB: Allow inbound from internet on ports 80, 443
+      
+      **Load Balancing:**
+      - Application Load Balancer (ALB) for ECS services
+      - Health checks on /health endpoint
+      - SSL termination with ACM certificate
+      - Routing: Path-based routing to different ECS services
+      
+      **Network Connectivity:**
+      - NAT Gateway for outbound internet access from private subnets
+      - VPC Endpoints for S3 access (reduces NAT Gateway costs)
+      - VPN connection for secure admin access
+      
+    keywords: ["networking", "vpc", "security", "load", "balancer", "alb", "aws"]
+

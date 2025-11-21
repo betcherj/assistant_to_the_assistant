@@ -1,0 +1,36 @@
+# Feature Specification
+# This file defines a feature request for prompt generation
+
+feature_description: |
+  Add user authentication endpoint that accepts email and password.
+  The endpoint should validate credentials, generate a JWT token, and return it along with user information.
+  Implement rate limiting to prevent brute force attacks.
+
+feature_type: feature  # Options: feature, fix, instance
+
+model: gpt-4-turbo-preview  # Target LLM model
+
+# Context selection options
+include_all_context: false  # If true, includes all context; if false, uses intelligent selection
+enable_classification: true  # Enable LLM-based artifact classification
+enable_optimization: true    # Enable LLM-based prompt optimization
+
+# Optional: Feature-level examples
+feature_examples:
+  - input_description: "POST /auth/login with email and password"
+    output_description: "JWT token and user info"
+    example: |
+      Input: {"email": "user@example.com", "password": "secure123"}
+      Output: {
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": {
+          "id": 123,
+          "email": "user@example.com",
+          "name": "John Doe"
+        },
+        "expires_in": 3600
+      }
+
+# Optional: Output file to save the generated prompt
+output_file: generated_prompt.txt
+

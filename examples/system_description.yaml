@@ -1,0 +1,38 @@
+# System Description Configuration
+# This file defines system-level input/output examples, components, and infrastructure
+
+io_examples:
+  - input_description: "POST /users with user data (email, password, name)"
+    output_description: "Created user object with ID, email, name, and created_at timestamp"
+    example: |
+      Input: {"email": "user@example.com", "password": "secure123", "name": "John Doe"}
+      Output: {"id": 123, "email": "user@example.com", "name": "John Doe", "created_at": "2024-01-01T00:00:00Z"}
+
+  - input_description: "GET /users/{id}"
+    output_description: "User object with all fields"
+    example: |
+      Input: GET /users/123
+      Output: {"id": 123, "email": "user@example.com", "name": "John Doe", "created_at": "2024-01-01T00:00:00Z"}
+
+components: []
+  # Components will be automatically indexed from codebase
+  # You can also manually add components here:
+  # - name: "UserService"
+  #   description: "Handles user-related business logic"
+  #   file_path: "src/services/user_service.py"
+  #   dependencies: ["UserRepository", "EmailService"]
+
+infrastructure:
+  deployment: "Docker containers on AWS ECS"
+  databases:
+    - "PostgreSQL 14 for primary data storage"
+    - "Redis for caching and session storage"
+  services:
+    - "AWS S3 for file storage"
+    - "AWS SES for email delivery"
+    - "Auth0 for SSO integration"
+  configuration: |
+    Environment variables are used for configuration.
+    Secrets are stored in AWS Secrets Manager.
+    Application runs in ECS Fargate with auto-scaling enabled.
+

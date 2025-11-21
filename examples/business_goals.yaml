@@ -1,0 +1,14 @@
+# Business Goals Configuration
+# This file defines the business context and external constraints for your project
+
+purpose: |
+  Build a REST API for managing user accounts with authentication and authorization.
+  The system should support user registration, login, profile management, and role-based access control.
+
+external_constraints:
+  - Must comply with GDPR regulations
+  - Must support 10k concurrent users
+  - Must maintain 99.9% uptime SLA
+  - Must integrate with existing SSO provider
+  - Must support multi-factor authentication
+

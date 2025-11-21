@@ -1,0 +1,33 @@
+# Software Development Task
+## Business Context
+**Purpose:** Not specified
+
+## System Description
+## Development Guidelines
+## Task
+**Type:** feature
+**Description:** Add user authentication endpoint that accepts email and password.
+The endpoint should validate credentials, generate a JWT token, and return it along with user information.
+Implement rate limiting to prevent brute force attacks.
+
+
+### Feature Examples
+**Input:** POST /auth/login with email and password
+**Output:** JWT token and user info
+**Example:**
+```
+Input: {"email": "user@example.com", "password": "secure123"}
+Output: {
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 123,
+    "email": "user@example.com",
+    "name": "John Doe"
+  },
+  "expires_in": 3600
+}
+
+```
+
+---
+Please implement this feature following the guidelines and using the system context provided above.

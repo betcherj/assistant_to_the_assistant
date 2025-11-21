@@ -1,0 +1,49 @@
+# Business Context for ETL Repository
+# This describes the business domain and context for an ETL system that uses LLM
+# natural language parsing to extract Pydantic models from text
+
+purpose: |
+  Build an ETL (Extract, Transform, Load) system that processes unstructured text documents
+  and uses Large Language Models (LLMs) to extract structured data as Pydantic models.
+  The system handles domain-specific language in prompts and order processing workflows.
+  The extracted models represent business entities like orders, customers, and products
+  from natural language text sources such as emails, invoices, and customer communications.
+
+external_constraints:
+  - Must process documents in multiple formats (PDF, plain text, markdown)
+  - Must handle domain-specific terminology and abbreviations
+  - Must support batch processing for high-volume document ingestion
+  - Must maintain audit trails for all extracted data
+  - Must comply with data privacy regulations (GDPR, CCPA)
+  - Must support real-time processing for urgent orders
+  - Must handle multilingual documents (primary: English, secondary: Spanish, French)
+
+domain_terminology:
+  order_model:
+    - "PO" refers to Purchase Order
+    - "SKU" refers to Stock Keeping Unit
+    - "ETA" refers to Estimated Time of Arrival
+    - "FOB" refers to Free On Board shipping terms
+    - "Net 30" refers to payment terms (30 days)
+  
+  prompt_model:
+    - "Entity extraction" refers to identifying business entities in text
+    - "Field mapping" refers to mapping extracted text to Pydantic model fields
+    - "Confidence score" refers to LLM's confidence in extraction accuracy
+    - "Validation rules" refer to business rules for data quality
+
+business_rules:
+  - Orders must have a valid customer reference
+  - Order amounts must be positive numbers
+  - Product SKUs must match inventory system format
+  - Shipping addresses must include country code
+  - Order dates cannot be in the future
+  - Priority orders (marked "URGENT") must be processed within 5 minutes
+
+data_entities:
+  - Order: Contains order details, customer info, line items, shipping info
+  - Customer: Contains customer identification and contact information
+  - Product: Contains product details, SKU, pricing information
+  - ShippingAddress: Contains shipping destination details
+  - OrderLineItem: Contains individual product line items within an order
+
